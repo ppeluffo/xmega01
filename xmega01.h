@@ -9,7 +9,6 @@
 #define SRC_XMEGA01_H_
 
 #include <avr/io.h>
-
 #include <stdlib.h>
 #include <avr/interrupt.h>
 #include <compat/deprecated.h>
@@ -19,6 +18,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include "avr_compiler.h"
 #include "clksys_driver.h"
 
@@ -35,11 +35,11 @@
 #include "limits.h"
 
 #include "FRTOS-IO.h"
-#include "cmdline.h"
-#include "sp5Klibs/rtc_sp5K.h"
+#include "drivers/sp6Kboard/sp6K_rtc.h"
+#include "sp6Klibs/cmdline.h"
 
-#define SP6K_REV "1.0.3"
-#define SP6K_DATE "@ 20161103"
+#define SP6K_REV "0.0.1"
+#define SP6K_DATE "@ 20170523"
 
 #define SP6K_MODELO "sp6KV1 HW:xmega256A3 R1.0"
 #define SP6K_VERSION "FW:FRTOS8"
@@ -56,6 +56,7 @@ void tk1(void * pvParameters);
 void tk2(void * pvParameters);
 void tk3(void * pvParameters);
 void tkCmd(void * pvParameters);
+void tkControl(void * pvParameters);
 void initMCU(void);
 
 s08 pvConfigBTbaud(char *s_baud);
@@ -69,12 +70,13 @@ s08 pvSetGprsPwr( u08 value );
 s08 pvSetGprsSw( u08 value );
 s08 pvSetGprsRts( u08 value );
 s08 pvSetBtPwr( u08 value );
-void pv_cmdRdRTC(void);
-s08 u_wrRtc(char *s);
+
+bool pvSetSensorPwr( uint8_t value );
+bool pvSetAN3_6Pwr( uint8_t value );
 
 #define CHAR128	128
 char d_printfBuff[CHAR128];
-TaskHandle_t xHandle_tk1,xHandle_tk2,xHandle_tk3, xHandle_tkCmd;
+TaskHandle_t xHandle_tk1,xHandle_tk2,xHandle_tk3, xHandle_tkCmd, xHandle_tkControl;
 
 #define CHAR256	256
 
@@ -108,6 +110,31 @@ TaskHandle_t xHandle_tk1,xHandle_tk2,xHandle_tk3, xHandle_tkCmd;
 #define XBEE_SLEEP_PIN		6
 #define XBEE_SLEEP_PORT	PORTF
 
-#define DEBUG_I2C	1
+// SPI CS
+#define MEM_CS_PIN		4
+#define MEM_CS_PORT	PORTC
+
+// SENSOR_PWR
+#define PWR_SENSOR_PIN		4
+#define PWR_SENSOR_PORT		PORTA
+
+// 3.6V AN PWR
+#define AN_PWR_3_6V_PIN		6
+#define AN_PWR_3_6V_PORT	PORTA
+
+// WATCHDOG
+u08 systemWdg;
+
+#define WDG_CTL			0x01
+#define WDG_CMD			0x02
+#define WDG_TK1			0x04
+#define WDG_TK2			0x08
+
+
+void u_clearWdg( u08 wdgId );
+
+// DEBUG
+char debug_printfBuff[256];
+//------------------------------------------------------------------------------------
 
 #endif /* SRC_XMEGA01_H_ */

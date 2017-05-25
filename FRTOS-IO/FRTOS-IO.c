@@ -7,18 +7,22 @@
  */
 
 #include "FRTOS-IO.h"
-#include "xmega01.h"
-#include "sp5K_uart.h"
-#include "sp5K_i2c.h"
 
-void pv_enqueue( UART_device_control_t *pUart, char *pC );
-s08 pv_queueReachHighWaterMark( UART_device_control_t *pUart);
-s08 pv_queueReachLowWaterMark( UART_device_control_t *pUart);
+#ifdef DEBUG_I2C
+#include "../xmega01.h"
+#endif
+
+//------------------------------------------------------------------------------------
+// FUNCIONES Privadas
+//------------------------------------------------------------------------------------
+static void pv_enqueue( UART_device_control_t *pUart, char *pC );
+static bool pv_queueReachHighWaterMark( UART_device_control_t *pUart);
+static bool pv_queueReachLowWaterMark( UART_device_control_t *pUart);
 
 //------------------------------------------------------------------------------------
 // FUNCIONES GENERALES FreeRTOS ( son las que usa la aplicacion )
 //------------------------------------------------------------------------------------
-Peripheral_Descriptor_t FreeRTOS_open(const u08 port, const u32 flags)
+Peripheral_Descriptor_t FreeRTOS_open(const uint8_t port, const u32 flags)
 {
 
 	switch(port) {
@@ -42,6 +46,10 @@ Peripheral_Descriptor_t FreeRTOS_open(const u08 port, const u32 flags)
 	case pI2C:
 		pdI2C.portId = port;
 		FreeRTOS_I2C_open (&pdI2C, flags);
+		break;
+	case pRTC:
+		pdRTC.portId = port;
+		FreeRTOS_RTC_open (&pdRTC, flags);
 		break;
 	}
 
@@ -76,7 +84,7 @@ Peripheral_Control_t *pxPeripheralControl = ( Peripheral_Control_t * ) xPeripher
 //------------------------------------------------------------------------------------
 // FUNCIONES DE UART PROVISTAS AL FREERTOS
 //------------------------------------------------------------------------------------
-int FreeRTOS_UART_open( Peripheral_Control_t * const pxPeripheralControl, const u32 flags )
+int FreeRTOS_UART_open( Peripheral_Control_t * const pxPeripheralControl, const uint32_t flags )
 
 {
 	/* Los dispositivos tipo UART requieren inicializar sus queues y un semaforo.
@@ -232,37 +240,37 @@ size_t wBytes = 0;
 
 }
 //------------------------------------------------------------------------------------
-s08 pv_queueReachLowWaterMark( UART_device_control_t *pUart)
+static bool pv_queueReachLowWaterMark( UART_device_control_t *pUart)
 {
-s08 retS = FALSE;
+bool retS = false;
 
 	if ( pUart->txBufferType == QUEUE ) {
 		if ( uxQueueMessagesWaiting( pUart->txStruct ) < (int)(0.2 * pUart->txBufferLength ))
-			retS = TRUE;
+			retS = true;
 	} else {
 		if ( uxFifoMessagesWaiting( pUart->txStruct ) < (int)(0.2 * pUart->txBufferLength ))
-			retS = TRUE;
+			retS = true;
 	}
 	return(retS);
 
 }
 //------------------------------------------------------------------------------------
-s08 pv_queueReachHighWaterMark( UART_device_control_t *pUart)
+static bool pv_queueReachHighWaterMark( UART_device_control_t *pUart)
 {
-s08 retS = FALSE;
+bool retS = false;
 
 	if ( pUart->txBufferType == QUEUE ) {
 		if ( uxQueueMessagesWaiting( pUart->txStruct ) > (int)(0.8 * pUart->txBufferLength ))
-			retS = TRUE;
+			retS = true;
 	} else {
 		if ( uxFifoMessagesWaiting( pUart->txStruct ) > (int)(0.8 * pUart->txBufferLength ))
-			retS = TRUE;
+			retS = true;
 	}
 	return(retS);
 
 }
 //------------------------------------------------------------------------------------
-void pv_enqueue( UART_device_control_t *pUart, char *pC )
+static void pv_enqueue( UART_device_control_t *pUart, char *pC )
 {
 	if ( pUart->txBufferType == QUEUE ) {
 		xQueueSend( pUart->txStruct, pC, ( TickType_t ) 10  );
@@ -343,7 +351,7 @@ UART_device_control_t *pUart;
 			xSemaphoreGive( pxPeripheralControl->xBusSemaphore );
 			break;
 		case ioctlSET_TIMEOUT:
-			pxPeripheralControl->xBlockTime = *((u08 *)pvValue);
+			pxPeripheralControl->xBlockTime = *((uint8_t *)pvValue);
 			break;
 		case ioctl_UART_CLEAR_RX_BUFFER:
 			if ( pUart->rxBufferType == QUEUE) {
@@ -367,18 +375,6 @@ UART_device_control_t *pUart;
 
 }
 //------------------------------------------------------------------------------------
-void pvFreeRTOS_CMD_writeChar (unsigned char c)
-{
-	// Funcion intermedia necesaria por cmdline para escribir de a 1 caracter en consola
-	// El tema es que el prototipo de funcion que requiere cmdlineSetOutputFunc no se ajusta
-	// al de FreeRTOS_UART_write, por lo que defino esta funcion intermedia.
-
-char cChar;
-
-	cChar = c;
-	FreeRTOS_CMD_write( &cChar, sizeof(char));
-}
-//------------------------------------------------------------------------------------
 char *FreeRTOS_UART_getFifoPtr(Peripheral_Control_t *UART)
 {
 	// Retorna un puntero al comienzo de buffer de la fifo de una UART.
@@ -398,65 +394,11 @@ char *p;
 	return(p);
 }
 //------------------------------------------------------------------------------------
-void FreeRTOS_CMD_write( const void *pvBuffer, const size_t xBytes )
-{
-	// En el SP6K el USB y BT operan juntos como I/O de la tarea de comando
-	// Para simplificar la escritura usamos esta funcion de modo que en el programa
-	// no tenemos que escribir en ambos handles.
-
-	FreeRTOS_write( &pdUART_USB, pvBuffer, xBytes );
-	FreeRTOS_write( &pdUART_BT, pvBuffer, xBytes );
-
-}
-/*------------------------------------------------------------------------------------*/
-size_t FreeRTOS_CMD_read(  void *pvBuffer, const size_t xBytes )
-{
-
-	// Como el USB y BT operan en paralelo para el modo comando, los caracteres pueden entrar
-	// por cualquiera de los handles.
-	// Lee caracteres de ambas FIFO de recepcion de la USB y BT
-	// No considera el caso que los handles sean QUEUES !!!!
-
-size_t xBytesReceived = 0U;
-portTickType xTicksToWait;
-xTimeOutType xTimeOut;
-UART_device_control_t *pUartUSB, *pUartBT;
-
-	pUartUSB = pdUART_USB.phDevice;
-	pUartBT =  pdUART_BT.phDevice;
-
-	xTicksToWait = pdUART_USB.xBlockTime;
-	xTicksToWait = 5;
-	vTaskSetTimeOutState( &xTimeOut );
-
-	/* Are there any more bytes to be received? */
-	while( xBytesReceived < xBytes )
-	{
-		/* Receive the next character. */
-		// Los FIFO no tienen timeout, retornan enseguida
-		if(  ( xFifoReceive( pUartUSB->rxStruct, &((char *)pvBuffer)[ xBytesReceived ], xTicksToWait ) == pdPASS ) || ( xFifoReceive( pUartBT->rxStruct, &((char *)pvBuffer)[ xBytesReceived ], xTicksToWait ) == pdPASS ) ) {
-			xBytesReceived++;
-		} else {
-			// Espero xTicksToWait antes de volver a chequear
-			vTaskDelay( ( TickType_t)( xTicksToWait ) );
-		}
-
-		/* Time out has expired ? */
-		if( xTaskCheckForTimeOut( &xTimeOut, &xTicksToWait ) != pdFALSE )
-		{
-			break;
-		}
-	}
-
-	return xBytesReceived;
-
-}
-/*------------------------------------------------------------------------------------*/
 
 //------------------------------------------------------------------------------------
 // FUNCIONES DE I2C ( TWI)
 //------------------------------------------------------------------------------------
-portBASE_TYPE FreeRTOS_I2C_open( Peripheral_Control_t * const pxPeripheralControl, const u32 flags )
+portBASE_TYPE FreeRTOS_I2C_open( Peripheral_Control_t * const pxPeripheralControl, const uint32_t flags )
 {
 
 	// Todos los dispositivos I2C comparten el mismo semaforo por lo tanto lo pongo como una
@@ -476,7 +418,7 @@ I2C_device_control_t *pxNewI2C;
 		pxNewI2C = ( int8_t * ) pvPortMalloc( sizeof(I2C_device_control_t ));
 		pxPeripheralControl->phDevice = pxNewI2C;
 		// Abro e inicializo el puerto I2C solo la primera vez que soy invocado
-		I2C_MasterInit(100);
+		I2C_init();
 
 		return(1);
 }
@@ -490,16 +432,12 @@ size_t xReturn = 0U;
 	pI2C = pxPeripheralControl->phDevice;
 
 #ifdef DEBUG_I2C
-		snprintf_P( d_printfBuff,CHAR128,PSTR("FRTOS_I2C_WR: 0x%02x,0x%02x,0x%02x\r\n\0"),pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress);
-		FreeRTOS_CMD_write( d_printfBuff, sizeof(d_printfBuff) );
+		snprintf_P( debug_printfBuff,CHAR128,PSTR("FRTOS_I2C_WR: 0x%02x,0x%02x,0x%02x,0x%02x\r\n\0"),pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, xBytes);
+		CMD_write( debug_printfBuff, sizeof(debug_printfBuff) );
 #endif
-	if ( I2C_masterWriteRead(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, xBytes, 0) == TRUE ) {
-		xReturn = xBytes;
-	}
 
-	while ( I2CdataStruct.I2Cstatus != TWIM_STATUS_READY) {
-		vTaskDelay( ( TickType_t)( 2 ) );
-		/* Wait until transaction is complete. */
+	if ( I2C_master_write(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, xBytes) == true ) {
+		xReturn = xBytes;
 	}
 
 	return(xReturn);
@@ -514,13 +452,16 @@ size_t xReturn = 0U;
 	pI2C = pxPeripheralControl->phDevice;
 
 #ifdef DEBUG_I2C
-		snprintf_P( d_printfBuff,CHAR128,PSTR("FRTOS_I2C_RD: 0x%02x,0x%02x,0x%02x\r\n\0"),pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress);
-		FreeRTOS_CMD_write( d_printfBuff, sizeof(d_printfBuff) );
+		snprintf_P( debug_printfBuff,CHAR128,PSTR("FRTOS_I2C_RD: 0x%02x,0x%02x,0x%02x,0x%02x\r\n\0"),pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, xBytes);
+		CMD_write( debug_printfBuff, sizeof(debug_printfBuff) );
 #endif
-	if ( I2C_masterWriteRead(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, 0, xBytes ) == TRUE ) {
+
+	if ( I2C_master_read(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, xBytes) == true ) {
 		xReturn = xBytes;
 	}
+
 	return(xReturn);
+
 }
 //------------------------------------------------------------------------------------
 portBASE_TYPE FreeRTOS_I2C_ioctl( Peripheral_Descriptor_t pxPeripheral, uint32_t ulRequest, void *pvValue )
@@ -528,14 +469,14 @@ portBASE_TYPE FreeRTOS_I2C_ioctl( Peripheral_Descriptor_t pxPeripheral, uint32_t
 Peripheral_Control_t * const pxPeripheralControl = ( Peripheral_Control_t * const ) pxPeripheral;
 portBASE_TYPE xReturn = pdPASS;
 I2C_device_control_t *pI2C;
-u16 *p;
+uint16_t *p;
 
 		pI2C = pxPeripheralControl->phDevice;
 		p = pvValue;
 
 #ifdef DEBUG_I2C
-		snprintf_P( d_printfBuff,CHAR128,PSTR("FRTOS_I2C_IOCTL: 0x%02x,0x%02x\r\n\0"),(u08)ulRequest, (u08)(*p));
-		FreeRTOS_CMD_write( d_printfBuff, sizeof(d_printfBuff) );
+		snprintf_P( debug_printfBuff,CHAR128,PSTR("FRTOS_I2C_IOCTL: 0x%02x,0x%02x\r\n\0"),(uint8_t)ulRequest, (uint8_t)(*p));
+		CMD_write( debug_printfBuff, sizeof(debug_printfBuff) );
 #endif
 		switch( ulRequest )
 		{
@@ -554,7 +495,7 @@ u16 *p;
 				pI2C->devAddress = (int8_t)(*p);
 				break;
 			case ioctl_I2C_SET_BYTEADDRESS:
-				pI2C->byteAddress = (u16)(*p);
+				pI2C->byteAddress = (uint16_t)(*p);
 				break;
 			case ioctl_I2C_SET_BYTEADDRESSLENGTH:
 				pI2C->byteAddressLength = (int8_t)(*p);
@@ -567,3 +508,51 @@ u16 *p;
 
 }
 //------------------------------------------------------------------------------------
+// FUNCIONES DE RTC
+//------------------------------------------------------------------------------------
+portBASE_TYPE FreeRTOS_RTC_open( Peripheral_Control_t * const pxPeripheralControl, const uint32_t flags )
+{
+
+	// Asigno las funciones particulares ed write,read,ioctl
+	pxPeripheralControl->write = FreeRTOS_RTC_write;
+	pxPeripheralControl->read = FreeRTOS_RTC_read;
+	pxPeripheralControl->ioctl = NULL;
+
+	// Abro e inicializo el puerto I2C solo la primera vez que soy invocado
+	RTC_init();
+
+	return(1);
+}
+//------------------------------------------------------------------------------------
+size_t FreeRTOS_RTC_write( Peripheral_Descriptor_t const pxPeripheral, const void *pvBuffer, const size_t xBytes )
+{
+Peripheral_Control_t * const pxPeripheralControl = ( Peripheral_Control_t * const ) pxPeripheral;
+//I2C_device_control_t *pI2C;
+size_t xReturn = 0U;
+
+//	pI2C = pxPeripheralControl->phDevice;
+
+//	if ( I2C_master_write(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, xBytes) == true ) {
+//		xReturn = xBytes;
+//	}
+
+	return(xReturn);
+}
+//------------------------------------------------------------------------------------
+size_t FreeRTOS_RTC_read( Peripheral_Descriptor_t const pxPeripheral, void * const pvBuffer, const size_t xBytes )
+{
+Peripheral_Control_t * const pxPeripheralControl = ( Peripheral_Control_t * const ) pxPeripheral;
+//I2C_device_control_t *pI2C;
+size_t xReturn = 0U;
+
+//	pI2C = pxPeripheralControl->phDevice;
+
+//	if ( I2C_master_read(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, xBytes) == true ) {
+//		xReturn = xBytes;
+//	}
+
+	return(xReturn);
+
+}
+//------------------------------------------------------------------------------------
+

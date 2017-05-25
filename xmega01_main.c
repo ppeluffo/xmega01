@@ -14,11 +14,17 @@
  *  PENDIENTE:
  *  Hacer andar el watchdog
  *  Cambiar la velocidad y reconffigurar el BT
-  *
+ *
+ * 2017-05-16:
+ * Configuro el RTC.
+ * Rutinas de calendario.
+ *
  */
 
 
 #include "xmega01.h"
+
+static void configure_systemMainClock(void);
 
 int a;
 
@@ -27,27 +33,26 @@ char cmd_printfBuff[64];
 int main( void )
 {
 
+
 	initMCU();
-	pvSetBtPwr(1);	// 	prenderBT()
 
 	// Clock principal del sistema
-	SET_systemMainClock();
-
-	//testPort();
-	//configureTimer_1();
-	//configureTimer();
+	configure_systemMainClock();
+	//RTC_init();
 
 	FreeRTOS_open(pUART_USB, ( UART_RXFIFO + UART_TXQUEUE ));
 	FreeRTOS_open(pUART_BT, ( UART_RXFIFO + UART_TXQUEUE ));
 	FreeRTOS_open(pUART_GPRS, ( UART_RXFIFO + UART_TXQUEUE ));
 	FreeRTOS_open(pUART_XBEE, ( UART_RXFIFO + UART_TXQUEUE ));
-	FreeRTOS_open(pI2C, NULL );
+	FreeRTOS_open(pI2C, 0 );
+	FreeRTOS_open(pRTC, 0 );
 
-
-	xTaskCreate(tk1, "CMD1", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tk1 );
-	xTaskCreate(tk2, "CMD2", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tk2 );
+	xTaskCreate(tk1, "TK1", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tk1 );
+	xTaskCreate(tk2, "TK2", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tk2 );
 //	xTaskCreate(tk3, "CMD3", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tk3 );
-	xTaskCreate(tkCmd, "CMD4", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tkCmd );
+	xTaskCreate(tkCmd, "CMD", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tkCmd );
+
+	xTaskCreate(tkControl, "CTL", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tkControl );
 
 	/* Arranco el RTOS. */
 	vTaskStartScheduler();
@@ -65,7 +70,29 @@ void vApplicationIdleHook( void )
 	}
 
 }
-/*------------------------------------------------------------------------------------*/
+//-----------------------------------------------------------
+static void configure_systemMainClock(void)
+{
+/*	Configura el clock principal del sistema
+	Inicialmente se arranca en 2Mhz.
+	La configuracion del reloj tiene 2 componentes: el clock y el oscilador.
+	Primero configuramos el oscilador de 32Mhz. Cuando este estable podemos
+	configurar el clock del sistema para que use dicho oscilador.
+	Opcionalmente podriamos deshabilitar el oscilador de 2Mhz para ahorrar energia.
+*/
+
+	// Habilito el oscilador de 32Mhz
+	OSC.CTRL |= OSC_RC32MEN_bm;
+	// Espero que este estable
+	do {} while ( (OSC.STATUS & OSC_RC32MRDY_bm) == 0 );
+	// Seteo el clock para que use el oscilador de 32Mhz.
+	// Uso la funcion CCPWrite porque hay que se cuidadoso al tocar estos
+	// registros.
+	CCPWrite(&CLK.CTRL, CLK_SCLKSEL_RC32M_gc);
+	//
+
+}
+//-----------------------------------------------------------
 void tk1(void * pvParameters)
 {
 
@@ -79,15 +106,16 @@ char LED1;
 
 	for( ;; )
 	{
-		LED1 = PORTA.IN;
-		LED1 ^= _BV(2);
-		PORTA.OUT = LED1;
-		vTaskDelay( ( TickType_t)( 150 / portTICK_RATE_MS ) );
 
 		LED1 = PORTA.IN;
 		LED1 ^= _BV(2);
 		PORTA.OUT = LED1;
 		vTaskDelay( ( TickType_t)( 50 / portTICK_RATE_MS ) );
+
+		LED1 = PORTA.IN;
+		LED1 ^= _BV(2);
+		PORTA.OUT = LED1;
+		vTaskDelay( ( TickType_t)( 950 / portTICK_RATE_MS ) );
 	}
 
 }
@@ -107,12 +135,12 @@ char LED1;
 		LED1 = PORTA.IN;
 		LED1 ^= _BV(3);
 		PORTA.OUT = LED1;
-		vTaskDelay( ( TickType_t)( 30 / portTICK_RATE_MS ) );
+		vTaskDelay( ( TickType_t)( 500 / portTICK_RATE_MS ) );
 
 		LED1 = PORTA.IN;
 		LED1 ^= _BV(3);
 		PORTA.OUT = LED1;
-		vTaskDelay( ( TickType_t)( 20 / portTICK_RATE_MS ) );
+		vTaskDelay( ( TickType_t)( 500 / portTICK_RATE_MS ) );
 	}
 
 }
@@ -126,23 +154,6 @@ void tk3_1(void * pvParameters)
 
 char cChar;
 char c;
-
-//	memset(cmd_printfBuff,'\0', sizeof(cmd_printfBuff));
-//	snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("AT+BAUD8\r\n\0"),cChar);
-//	FreeRTOS_write( &pdUART_BT, cmd_printfBuff, sizeof(cmd_printfBuff) );
-
-//	vTaskDelay( ( TickType_t)( 1000 / portTICK_RATE_MS ) );
-
-/*	while (1 ) {
-
-		c = '\0';	// Lo borro para que luego del un CR no resetee siempre el timer.
-		// el read se bloquea 50ms. lo que genera la espera.
-		while ( FreeRTOS_read( &pdUART_USB, &c, 1 ) == 1 ) {
-			FreeRTOS_write( &pdUART_USB, &c, 1 );
-		}
-	}
-
-*/
 
 	for( ;; )
 	{

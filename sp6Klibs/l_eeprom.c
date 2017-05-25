@@ -5,17 +5,17 @@
  *      Author: pablo
  */
 
-#include "ee_sp5K.h"
+#include "../sp6Klibs/l_eeprom.h"
 
 //------------------------------------------------------------------------------------
-s08 EE_read( u16 eeAddress, char *data, u08 length )
+bool EE_read( uint16_t eeAddress, char *data, uint8_t length )
 {
 	// Lee en la EE, desde la posicion 'address', 'length' bytes
 	// y los deja en el buffer apuntado por 'data'
 
 size_t xReturn = 0U;
-u16 val = 0;
-u08 xBytes = 0;
+uint16_t val = 0;
+uint8_t xBytes = 0;
 
 		// Lo primero es obtener el semaforo
 		FreeRTOS_ioctl(&pdI2C,ioctlOBTAIN_BUS_SEMPH, NULL);
@@ -36,14 +36,14 @@ u08 xBytes = 0;
 		FreeRTOS_ioctl(&pdI2C,ioctlRELEASE_BUS_SEMPH, NULL);
 
 		if (xReturn != xBytes ) {
-			return ( FALSE );
+			return ( false );
 		}
 
-		return(TRUE);
+		return(true);
 
 }
 //------------------------------------------------------------------------------------
-s08 EE_write( u16 eeAddress, char *data, u08 length )
+bool EE_write( uint16_t eeAddress, char *data, uint8_t length )
 {
 	// Escribe en la EE a partir de la posicion 'address', la cantidad
 	// 'length' de bytes apuntados por 'data'
@@ -51,9 +51,9 @@ s08 EE_write( u16 eeAddress, char *data, u08 length )
 	// salime de la pagina.
 	//
 size_t xReturn = 0U;
-u16 val = 0;
-u08 xBytes = 0;
-u16 n, pageBytesFree;
+uint16_t val = 0;
+uint8_t xBytes = 0;
+uint16_t n, pageBytesFree;
 
 	// Lo primero es obtener el semaforo
 	FreeRTOS_ioctl(&pdI2C,ioctlOBTAIN_BUS_SEMPH, NULL);
@@ -80,10 +80,38 @@ u16 n, pageBytesFree;
 	FreeRTOS_ioctl(&pdI2C,ioctlRELEASE_BUS_SEMPH, NULL);
 
 	if (xReturn != xBytes ) {
-		return ( FALSE );
+		return ( false );
 	}
 
-	return(TRUE);
+	return(true);
 
 }
 //------------------------------------------------------------------------------------
+bool EE_test_write(char *s0, char *s1)
+{
+uint8_t length = 0;
+char *p;
+bool retS = false;
+
+	p = s1;
+	while (*p != 0) {
+		p++;
+		length++;
+	}
+//	snprintf_P( debug_printfBuff,sizeof(debug_printfBuff),PSTR("S=[%s](%d)\r\n\0"),s1, length);
+//	FreeRTOS_write( &pdUART1, debug_printfBuff, sizeof(debug_printfBuff) );
+
+
+	retS = EE_write( (uint16_t)(atoi(s0)), s1, length );
+	return(retS);
+}
+//-----------------------------------------------------------------------------------
+bool EE_test_read(char *s0, char *s1, char *s2)
+{
+
+bool retS = false;
+
+	retS = EE_read( (uint16_t)(atoi(s0)), s1, (uint8_t)(atoi(s2)) );
+	return(retS);
+}
+//-----------------------------------------------------------------------------------

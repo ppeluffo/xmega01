@@ -7,28 +7,6 @@
 
 #include "xmega01.h"
 
-/*------------------------------------------------------------------------------------*/
-void WDT_EnableAndSetTimeout( WDT_PER_t period )
-{
-
-uint8_t temp = WDT_ENABLE_bm | WDT_CEN_bm | period;
-
-	CCP = CCP_IOREG_gc;
-	WDT.CTRL = temp;
-
-	/* Wait for WD to synchronize with new settings. */
-	while(WDT_IsSyncBusy()){
-
-	}
-}
-/*------------------------------------------------------------------------------------*/
-void WDT_DisableWindowMode( void )
-{
-	uint8_t temp = (WDT.WINCTRL & ~WDT_WEN_bm) | WDT_WCEN_bm;
-	CCP = CCP_IOREG_gc;
-	WDT.WINCTRL = temp;
-}
-/*------------------------------------------------------------------------------------*/
 void configureTimer(void)
 {
 	/* Configuro el TIMER0 ( 16 bits ) como fuente de interrupcion de ticks
@@ -59,68 +37,6 @@ void configureTimer(void)
 	TCC0.INTFLAGS = TC0_OVFIF_bm;	// Habilito las interrupciones en general
 	sei();
 
-}
-//-----------------------------------------------------------
-void SET_systemMainClock(void)
-{
-	// Configura el clock principal del sistema
-
-//	pvEnable2MHZclock();
-	pvEnable32MHZclock();
-
-
-}
-//-----------------------------------------------------------
-void pvEnable2MHZclock(void)
-{
-	/*  Enable internal 2 MHz rc oscillator and wait until it's
-	 *  stable. Set the 2 MHz rc oscillator as the main clock source.
-	 *  Then disable other oscillators.
-		*/
-	CLKSYS_Enable( OSC_RC2MEN_bm );
-	do {} while ( CLKSYS_IsReady( OSC_RC2MRDY_bm ) == 0 );
-	CLKSYS_Main_ClockSource_Select( CLK_SCLKSEL_RC2M_gc );
-	CLKSYS_Disable( OSC_RC32MEN_bm | OSC_RC32KEN_bm  );
-//	CLKSYS_Disable( OSC_PLLEN_bm );
-
-}
-//-----------------------------------------------------------
-void pvEnable32MHZclock(void)
-{
-	/*  Enable internal 32 MHz rc oscillator and wait until it's
-	 *  stable. Set the 32 MHz rc oscillator as the main clock source.
-	 *  Then disable other oscillators.
-		*/
-	CLKSYS_Enable( OSC_RC32MEN_bm );
-	do {} while ( CLKSYS_IsReady( OSC_RC32MRDY_bm ) == 0 );
-	CLKSYS_Main_ClockSource_Select( CLK_SCLKSEL_RC32M_gc );
-//	CLKSYS_Disable( OSC_RC2MEN_bm | OSC_RC32KEN_bm  );
-//	CLKSYS_Disable( OSC_PLLEN_bm );
-
-}
-//-----------------------------------------------------------
-s08 pvConfigBTbaud(char *s_baud)
-{
-	// Reconfigura el puerto serial del blueTooth.
-
-long baud;
-
-	baud =  atol(s_baud);
-	switch (baud) {
-	case 9600:
-//		USARTD0.BAUDCTRLA = (uint8_t) 1659;
-//		USARTD0.BAUDCTRLB = ( -3 << USART_BSCALE0_bp)|(1659 >> 8);
-		snprintf_P( d_printfBuff,sizeof(d_printfBuff),PSTR("BAUD9600\r\n"));
-		FreeRTOS_CMD_write( d_printfBuff, sizeof(d_printfBuff) );
-		break;
-	case 115200:
-//		USARTD0.BAUDCTRLA = (uint8_t) 2094;
-//		USARTD0.BAUDCTRLB = ( -7 << USART_BSCALE0_bp)|(2094 >> 8);
-		snprintf_P( d_printfBuff,sizeof(d_printfBuff),PSTR("BAUD115200\r\n"));
-		FreeRTOS_CMD_write( d_printfBuff, sizeof(d_printfBuff) );
-		break;
-	}
-	return(TRUE);
 }
 //-----------------------------------------------------------
 void initMCU(void)
@@ -163,6 +79,19 @@ void initMCU(void)
 //	XBEE_RESET_PORT.DIR |= _BV(XBEE_RESET_PIN);		// RESET output
 //	XBEE_RESET_PORT.OUT &= ~(_BV(XBEE_RESET_PIN));	// RESET Low
 	XBEE_RESET_PORT.DIR &= ~(_BV(XBEE_RESET_PIN));	// RESET input
+
+	// SPI MEM_CS
+	MEM_CS_PORT.DIR |= _BV(MEM_CS_PIN);				// MEM_CS output
+	MEM_CS_PORT.OUT |= _BV(MEM_CS_PIN);				// MEM_CS High ( disabled )
+
+	// Salidas
+	PWR_SENSOR_PORT.DIR |= _BV(PWR_SENSOR_PIN);			// Output
+	PWR_SENSOR_PORT.PIN4CTRL = PORT_OPC_WIREDOR_gc;		// Wired OR
+	PWR_SENSOR_PORT.OUT &= ~(_BV(PWR_SENSOR_PIN));		// Low
+
+	AN_PWR_3_6V_PORT.DIR |= _BV(AN_PWR_3_6V_PIN);			// Output
+	AN_PWR_3_6V_PORT.PIN4CTRL = PORT_OPC_WIREDOR_gc;	// Wired OR
+	AN_PWR_3_6V_PORT.OUT &= ~(_BV(AN_PWR_3_6V_PIN));	// Low
 
 }
 //-----------------------------------------------------------
@@ -213,84 +142,53 @@ s08 retS = FALSE;
 	return(retS);
 }
 //------------------------------------------------------------------------------------
-s08 pvSetGprsRts( u08 value )
+bool pvSetSensorPwr( uint8_t value )
 {
 
-s08 retS = FALSE;
+bool retS = false;
 
 	switch ( value ) {
 	case 0:
-		// RTS Low
-		GPRS_RTS_PORT.OUT &= ~(_BV(GPRS_RTS_PIN));	// RTS Low
-		retS = TRUE;
+		// Apago
+		PWR_SENSOR_PORT.OUT &= ~(_BV(PWR_SENSOR_PIN));	// Low
+//		CMD_write( "SENSOR_OFF", sizeof("SENSOR_OFF") );
+		retS = true;
 		break;
 	case 1:
-		// RTS high
-		GPRS_RTS_PORT.OUT |= _BV(GPRS_RTS_PIN);		// RTS High
-		retS = TRUE;
+		// Prendo
+		PWR_SENSOR_PORT.OUT |= _BV(PWR_SENSOR_PIN);	//  High
+//		CMD_write( "SENSOR_ON", sizeof("SENSOR_ON") );
+		retS = true;
 		break;
 	default:
-		retS = FALSE;
+		retS = false;
 		break;
 	}
 
 	return(retS);
 }
 //------------------------------------------------------------------------------------
-s08 pvSetBtPwr( u08 value )
+bool pvSetAN3_6Pwr( uint8_t value )
 {
 
-s08 retS = FALSE;
+bool retS = false;
 
 	switch ( value ) {
 	case 0:
-		// Apago el BT
-		BT_PWR_PORT.OUT &= ~(_BV(BT_PWR_PIN));	// PWR Low ( apagado )
-		retS = TRUE;
+		// Apago
+		AN_PWR_3_6V_PORT.OUT &= ~(_BV(AN_PWR_3_6V_PIN));	// Low
+		retS = true;
 		break;
 	case 1:
-		// Prendo el BT
-		BT_PWR_PORT.OUT |= _BV(BT_PWR_PIN);		// PWR High ( prendido )
-		retS = TRUE;
+		// Prendo
+		AN_PWR_3_6V_PORT.OUT |= _BV(AN_PWR_3_6V_PIN);	//  High
+		retS = true;
 		break;
 	default:
-		retS = FALSE;
+		retS = false;
 		break;
 	}
 
-	return(retS);
-}
-//------------------------------------------------------------------------------------
-s08 u_wrRtc(char *s)
-{
-u08 dateTimeStr[11];
-char tmp[3];
-s08 retS;
-RtcTimeType_t rtcDateTime;
-
-
-	/* YYMMDDhhmm */
-	if ( s == NULL )
-		return(FALSE);
-
-	memcpy(dateTimeStr, s, 10);
-	// year
-	tmp[0] = dateTimeStr[0]; tmp[1] = dateTimeStr[1];	tmp[2] = '\0';
-	rtcDateTime.year = atoi(tmp);
-	// month
-	tmp[0] = dateTimeStr[2]; tmp[1] = dateTimeStr[3];	tmp[2] = '\0';
-	rtcDateTime.month = atoi(tmp);
-	// day of month
-	tmp[0] = dateTimeStr[4]; tmp[1] = dateTimeStr[5];	tmp[2] = '\0';
-	rtcDateTime.day = atoi(tmp);
-	// hour
-	tmp[0] = dateTimeStr[6]; tmp[1] = dateTimeStr[7];	tmp[2] = '\0';
-	rtcDateTime.hour = atoi(tmp);
-	// minute
-	tmp[0] = dateTimeStr[8]; tmp[1] = dateTimeStr[9];	tmp[2] = '\0';
-	rtcDateTime.min = atoi(tmp);
-
-	retS = RTC_write(&rtcDateTime);
 	return(retS);
 }
 //------------------------------------------------------------------------------------

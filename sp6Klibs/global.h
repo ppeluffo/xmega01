@@ -22,13 +22,13 @@
 #define GLOBAL_H
 
 // global AVRLIB defines
-#include <../sp5Klibs/avrlibdefs.h>
-#include <../sp5Klibs/avrlibtypes.h>
+#include "../sp6Klibs/avrlibdefs.h"
+#include "../sp6Klibs/avrlibtypes.h"
 
 // project/system dependent defines
 
 // CPU clock speed
-#define F_CPU        32000000               		// 8MHz processor
+#define F_CPU        32000000               		// 32 MHz processor
 //#define F_CPU        16000000               		// 16MHz processor
 //#define F_CPU        14745000               		// 14.745MHz processor
 //#define F_CPU        8000000               		// 8MHz processor

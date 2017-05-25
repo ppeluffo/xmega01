@@ -22,7 +22,7 @@
 #ifndef CMDLINECONF_H
 #define CMDLINECONF_H
 
-#include <../sp5Klibs/global.h>
+#include "../sp6Klibs/global.h"
 
 // constants/macros/typdefs
 

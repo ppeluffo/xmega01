@@ -79,8 +79,8 @@
 #ifndef CMDLINE_H
 #define CMDLINE_H
 
-#include <../sp5Klibs/global.h>
-#include "cmdlineconf.h"
+#include "../sp6Klibs/cmdlineconf.h"
+#include "../sp6Klibs/global.h"
 
 // constants/macros/typdefs
 typedef void (*CmdlineFuncPtrType)(void);

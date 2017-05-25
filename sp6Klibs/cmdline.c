@@ -21,17 +21,17 @@
 
 
 //----- Include Files ---------------------------------------------------------
-#include "cmdline.h"
+#include "../sp6Klibs/cmdline.h"
 
 #include <avr/io.h>			// include I/O definitions (port names, pin names, etc)
 #include <avr/interrupt.h>	// include interrupt support
 #include <avr/pgmspace.h>	// include AVR program memory support
-#include <../sp5Klibs/global.h>		// include our global settings
 #include <string.h>			// include standard C string functions
 #include <stdlib.h>			// include stdlib for string conversion functions
 
+#include "../sp6Klibs/cmdlineconf.h"
+#include "../sp6Klibs/global.h"		// include our global settings
 #include "FRTOS-IO.h"
-#include "cmdlineconf.h"
 
 // defines
 #define ASCII_BEL				0x07
@@ -142,7 +142,7 @@ void cmdlineInputFunc(unsigned char c)
 				// move cursor forward one space (no erase)
 				//memset( cmdBuff,NULL, sizeof(cmdBuff) );
 				//snprintf_P( cmdBuff, sizeof(cmdBuff),PSTR("%c[%c"),ASCII_ESC,VT100_ARROWRIGHT);
-				//FreeRTOS_CMD_write(cmdBuff, sizeof(cmdBuff) );
+				//CMD_write(cmdBuff, sizeof(cmdBuff) );
 				cmdlineOutputFunc(ASCII_ESC);
 				cmdlineOutputFunc('[');
 				cmdlineOutputFunc(VT100_ARROWRIGHT);
@@ -150,25 +150,25 @@ void cmdlineInputFunc(unsigned char c)
 			else
 			{
 				// else, ring the bell
-				//FreeRTOS_CMD_write( 'ASCII_BEL', sizeof('ASCII_BEL') );
+				//CMD_write( 'ASCII_BEL', sizeof('ASCII_BEL') );
 				cmdlineOutputFunc(ASCII_BEL);
 			}
 			break;
 		case VT100_ARROWLEFT:
 			// if the edit position is non-zero
-			//FreeRTOS_CMD_write("BS1", sizeof("BS1") );
+			//CMD_write("BS1", sizeof("BS1") );
 			if(CmdlineBufferEditPos)
 			{
 				// decrement the edit position
 				CmdlineBufferEditPos--;
 				// move cursor back one space (no erase)
-				//FreeRTOS_CMD_write( 'ASCII_BS', sizeof(char) );
+				//CMD_write( 'ASCII_BS', sizeof(char) );
 				cmdlineOutputFunc(ASCII_BS);
 			}
 			else
 			{
 				// else, ring the bell
-				//FreeRTOS_CMD_write( 'ASCII_BEL', sizeof('ASCII_BEL') );
+				//CMD_write( 'ASCII_BEL', sizeof('ASCII_BEL') );
 				cmdlineOutputFunc(ASCII_BEL);
 			}
 			break;
@@ -204,7 +204,7 @@ void cmdlineInputFunc(unsigned char c)
 		if(CmdlineBufferEditPos == CmdlineBufferLength)
 		{
 			// echo character to the output
-			//FreeRTOS_CMD_write( &c, sizeof(c) );
+			//CMD_write( &c, sizeof(c) );
 			cmdlineOutputFunc(c);
 			// add it to the command line buffer
 			// SP5K
@@ -234,7 +234,7 @@ void cmdlineInputFunc(unsigned char c)
 			cmdlineRepaint();
 			// reposition cursor
 			for(i=CmdlineBufferEditPos; i<CmdlineBufferLength; i++) {
-				//FreeRTOS_CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
+				//CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
 				cmdlineOutputFunc(ASCII_BS);
 			}
 		}
@@ -244,7 +244,7 @@ void cmdlineInputFunc(unsigned char c)
 	{
 		// user pressed [ENTER]
 		// echo CR and LF to terminal
-		//FreeRTOS_CMD_write( "\r\n", sizeof("\r\n") );
+		//CMD_write( "\r\n", sizeof("\r\n") );
 		cmdlineOutputFunc(ASCII_CR);
 		cmdlineOutputFunc(ASCII_LF);
 		// add null termination to command
@@ -270,13 +270,13 @@ void cmdlineInputFunc(unsigned char c)
 				// echo backspace-space-backspace
 				memset( cmdBuff,NULL, sizeof(cmdBuff) );
 				///snprintf_P( cmdBuff, sizeof(cmdBuff),PSTR("%c %c"),ASCII_BS,ASCII_BS);
-				//FreeRTOS_CMD_write( cmdBuff, sizeof(cmdBuff) );
+				//CMD_write( cmdBuff, sizeof(cmdBuff) );
 				cmdlineOutputFunc(ASCII_BS);
-				//FreeRTOS_CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
+				//CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
 				cmdlineOutputFunc(' ');
-				//FreeRTOS_CMD_write( ' ', sizeof(char) );
+				//CMD_write( ' ', sizeof(char) );
 				cmdlineOutputFunc(ASCII_BS);
-				//FreeRTOS_CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
+				//CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
 				// decrement our buffer length and edit position
 				CmdlineBufferLength--;
 				CmdlineBufferEditPos--;
@@ -295,11 +295,11 @@ void cmdlineInputFunc(unsigned char c)
 				// repaint
 				cmdlineRepaint();
 				// add space to clear leftover characters
-				//FreeRTOS_CMD_write( ' ', sizeof(' ') );
+				//CMD_write( ' ', sizeof(' ') );
 				cmdlineOutputFunc(' ');
 				// reposition cursor
 				for(i=CmdlineBufferEditPos; i<(CmdlineBufferLength+1); i++) {
-					//FreeRTOS_CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
+					//CMD_write( 'ASCII_BS', sizeof('ASCII_BS') );
 					cmdlineOutputFunc(ASCII_BS);
 				}
 			}
@@ -307,7 +307,7 @@ void cmdlineInputFunc(unsigned char c)
 		else
 		{
 			// else, ring the bell
-			//FreeRTOS_CMD_write( 'ASCII_BEL', sizeof('ASCII_BEL') );
+			//CMD_write( 'ASCII_BEL', sizeof('ASCII_BEL') );
 			cmdlineOutputFunc(ASCII_BEL);
 		}
 	}
@@ -327,7 +327,7 @@ void cmdlineRepaint(void)
 	u08 i;
 
 	// carriage return
-	//FreeRTOS_CMD_write( "\r\ncmd>", sizeof("\r\ncmd>") );
+	//CMD_write( "\r\ncmd>", sizeof("\r\ncmd>") );
 	cmdlineOutputFunc(ASCII_CR);
 	// print fresh prompt
 	cmdlinePrintPrompt();
@@ -335,7 +335,7 @@ void cmdlineRepaint(void)
 	i = CmdlineBufferLength;
 	ptr = CmdlineBuffer;
 	//while(i--) cmdlineOutputFunc(*ptr++);
-	FreeRTOS_CMD_write( ptr, i );
+	CMD_write( ptr, i );
 }
 
 void cmdlineDoHistory(u08 action)
@@ -423,14 +423,14 @@ void cmdlinePrintPrompt(void)
 	// print a new command prompt
 	//u08* ptr = CmdlinePrompt;
 	//while(pgm_read_byte(ptr)) cmdlineOutputFunc( pgm_read_byte(ptr++) );
-	FreeRTOS_CMD_write( "cmd>", sizeof("cmd>") );
+	CMD_write( "cmd>", sizeof("cmd>") );
 }
 
 void cmdlinePrintError(void)
 {
 	u08 * ptr;
 
-	FreeRTOS_CMD_write( "command not found\r\n", sizeof("command not found\r\n") );
+	CMD_write( "command not found\r\n", sizeof("command not found\r\n") );
 	return;
 /*
 	// print a notice header

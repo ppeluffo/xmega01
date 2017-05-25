@@ -9,16 +9,16 @@
  *  una variable tipo unsigned char que entonces solo almacena 255 valores.
  */
 
-#ifndef SRC_SP5KDRIVERS_SP5K_UART_H_
-#define SRC_SP5KDRIVERS_SP5K_UART_H_
+#ifndef SRC_DRIVERS_SP5K_UART_H_
+#define SRC_DRIVERS_SP5K_UART_H_
 
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <../sp5Klibs/avrlibdefs.h>
-#include <../sp5Klibs/avrlibtypes.h>
-
 #include "FreeRTOS.h"
+
+#include "../../sp6Klibs/avrlibdefs.h"
+#include "../../sp6Klibs/avrlibtypes.h"
 #include "FRTOS-IO.h"
 //-----------------------------------------------------------------------
 void pvUARTInit( const int UARTx );
@@ -46,4 +46,4 @@ int xFifoReset( fifoHandle_t xFifo );
 size_t uxFifoSpacesAvailable( fifoHandle_t xFifo );
 size_t uxFifoMessagesWaiting( fifoHandle_t xFifo );
 
-#endif /* SRC_SP5KDRIVERS_SP5K_UART_H_ */
+#endif /* SRC_DRIVERS_SP5K_UART_H_ */

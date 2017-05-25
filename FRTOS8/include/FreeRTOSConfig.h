@@ -125,6 +125,6 @@ to exclude the API function. */
 #define configTIMER_TASK_STACK_DEPTH            256
 
 /* Dimensions a buffer used by the command interpreter. */
-//#define configCOMMAND_INT_MAX_OUTPUT_SIZE		256
+#define configCOMMAND_INT_MAX_OUTPUT_SIZE		1
 
 #endif /* FREERTOS_CONFIG_H */
