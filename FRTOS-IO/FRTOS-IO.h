@@ -21,6 +21,8 @@
 #include "../drivers/sp6Kboard/sp6K_uart.h"
 #include "../drivers/sp6Kboard/sp6K_i2c.h"
 #include "../drivers/sp6Kboard/sp6K_rtc.h"
+#include "../drivers/sp6Kboard/sp6K_spi.h"
+
 // Describo los diferentes perifericos a los  que puede acceder la aplicacion.
 // Para c/u voy a implementar funciones de init,write,read.
 typedef enum {
@@ -30,6 +32,7 @@ typedef enum {
 	pUART_XBEE,
 	pI2C,
 	pRTC,
+	pSPI,
 } t_perifericos;
 
 //#define DEBUG_I2C
@@ -62,7 +65,7 @@ typedef struct {
 } Peripheral_Control_t;
 
 // Dispositivos a los que voy a poder acceder.
-Peripheral_Control_t pdUART_USB, pdUART_BT, pdUART_GPRS, pdUART_XBEE, pdI2C, pdRTC;
+Peripheral_Control_t pdUART_USB, pdUART_BT, pdUART_GPRS, pdUART_XBEE, pdI2C, pdRTC, pdSPI;
 
 Peripheral_Descriptor_t FreeRTOS_open(const uint8_t port, const uint32_t flags);
 int FreeRTOS_ioctl( Peripheral_Descriptor_t const xPeripheral, uint32_t ulRequest, void *pvValue );
@@ -135,21 +138,6 @@ size_t FreeRTOS_I2C_write( Peripheral_Descriptor_t const pxPeripheral, const voi
 size_t FreeRTOS_I2C_read( Peripheral_Descriptor_t const pxPeripheral, void * const pvBuffer, const size_t xBytes );
 portBASE_TYPE FreeRTOS_I2C_ioctl( Peripheral_Descriptor_t pxPeripheral, uint32_t ulRequest, void *pvValue );
 
-
-#define ioctlQUEUE_FLUSH			1
-#define ioctlUART_ENABLE			2
-#define ioctlUART_DISABLE			3
-#define ioctlOBTAIN_BUS_SEMPH		4
-#define ioctlRELEASE_BUS_SEMPH		5
-
-#define ioctlSET_TIMEOUT			6
-#define ioctl_UART_CLEAR_RX_BUFFER	7
-#define ioctl_UART_CLEAR_TX_BUFFER	8
-
-#define ioctl_I2C_SET_DEVADDRESS			10
-#define ioctl_I2C_SET_BYTEADDRESS			11
-#define ioctl_I2C_SET_BYTEADDRESSLENGTH		12
-
 //------------------------------------------------------------------------------------
 // Estructura particular de RTC
 //------------------------------------------------------------------------------------
@@ -166,6 +154,41 @@ typedef struct {
 portBASE_TYPE FreeRTOS_RTC_open( Peripheral_Control_t * const pxPeripheralControl, const uint32_t flags );
 size_t FreeRTOS_RTC_write( Peripheral_Descriptor_t const pxPeripheral, const void *pvBuffer, const size_t xBytes );
 size_t FreeRTOS_RTC_read( Peripheral_Descriptor_t const pxPeripheral, void * const pvBuffer, const size_t xBytes );
+portBASE_TYPE FreeRTOS_RTC_ioctl( Peripheral_Descriptor_t pxPeripheral, uint32_t ulRequest, void *pvValue );
+
+//------------------------------------------------------------------------------------
+// Estructura particular de SPI
+//------------------------------------------------------------------------------------
+
+typedef struct {
+
+	// En las SPI solo requiero un estructura de almacenamiento de datos.
+	uint8_t devAddress;
+	uint8_t byteAddressLength;
+	uint16_t byteAddress;
+
+} SPI_device_control_t;
+
+portBASE_TYPE FreeRTOS_SPI_open( Peripheral_Control_t * const pxPeripheralControl, const uint32_t flags );
+size_t FreeRTOS_SPI_write( Peripheral_Descriptor_t const pxPeripheral, const void *pvBuffer, const size_t xBytes );
+size_t FreeRTOS_SPI_read( Peripheral_Descriptor_t const pxPeripheral, void * const pvBuffer, const size_t xBytes );
+portBASE_TYPE FreeRTOS_SPI_ioctl( Peripheral_Descriptor_t pxPeripheral, uint32_t ulRequest, void *pvValue );
+
+//------------------------------------------------------------------------------------
+
+#define ioctlQUEUE_FLUSH			1
+#define ioctlUART_ENABLE			2
+#define ioctlUART_DISABLE			3
+#define ioctlOBTAIN_BUS_SEMPH		4
+#define ioctlRELEASE_BUS_SEMPH		5
+
+#define ioctlSET_TIMEOUT			6
+#define ioctl_UART_CLEAR_RX_BUFFER	7
+#define ioctl_UART_CLEAR_TX_BUFFER	8
+
+#define ioctl_I2C_SET_DEVADDRESS			10
+#define ioctl_I2C_SET_BYTEADDRESS			11
+#define ioctl_I2C_SET_BYTEADDRESSLENGTH		12
 
 
 #endif /* SRC_FRTOS_IO_FRTOS_IO_H_ */

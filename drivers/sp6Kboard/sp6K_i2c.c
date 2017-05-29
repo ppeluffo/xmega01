@@ -34,7 +34,6 @@ bool pvI2C_write_slave_reg( const uint8_t devAddressLength, const uint16_t byteA
 bool pvI2C_write_data( const char txbyte);
 bool pvI2C_read_slave( uint8_t response_flag, char *rxByte );
 
-void pvI2C_checkStatus(void);
 bool pvI2C_waitForComplete(void);
 void pvI2C_reset(void);
 //------------------------------------------------------------------------------------

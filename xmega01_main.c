@@ -46,6 +46,7 @@ int main( void )
 	FreeRTOS_open(pUART_XBEE, ( UART_RXFIFO + UART_TXQUEUE ));
 	FreeRTOS_open(pI2C, 0 );
 	FreeRTOS_open(pRTC, 0 );
+	FreeRTOS_open(pSPI, 0 );
 
 	xTaskCreate(tk1, "TK1", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tk1 );
 	xTaskCreate(tk2, "TK2", tk1_STACK_SIZE, NULL, tk1_TASK_PRIORITY,  &xHandle_tk2 );

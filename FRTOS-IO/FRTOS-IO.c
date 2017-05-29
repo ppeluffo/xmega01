@@ -51,6 +51,10 @@ Peripheral_Descriptor_t FreeRTOS_open(const uint8_t port, const u32 flags)
 		pdRTC.portId = port;
 		FreeRTOS_RTC_open (&pdRTC, flags);
 		break;
+	case pSPI:
+		pdSPI.portId = port;
+		FreeRTOS_SPI_open (&pdSPI, flags);
+		break;
 	}
 
 	return(NULL);
@@ -77,6 +81,9 @@ Peripheral_Control_t *pxPeripheralControl = ( Peripheral_Control_t * ) xPeripher
 			break;
 		case pI2C:
 			FreeRTOS_I2C_ioctl( xPeripheral, ulRequest, pvValue );
+			break;
+		case pSPI:
+			FreeRTOS_SPI_ioctl( xPeripheral, ulRequest, pvValue );
 			break;
 	}
 	return(0);
@@ -513,12 +520,20 @@ uint16_t *p;
 portBASE_TYPE FreeRTOS_RTC_open( Peripheral_Control_t * const pxPeripheralControl, const uint32_t flags )
 {
 
+RTC_device_control_t *pxNewRTC;
+
 	// Asigno las funciones particulares ed write,read,ioctl
 	pxPeripheralControl->write = FreeRTOS_RTC_write;
 	pxPeripheralControl->read = FreeRTOS_RTC_read;
-	pxPeripheralControl->ioctl = NULL;
+	pxPeripheralControl->ioctl = FreeRTOS_RTC_ioctl;
 
-	// Abro e inicializo el puerto I2C solo la primera vez que soy invocado
+	// Creo el semaforo del bus I2C
+	pxPeripheralControl->xBusSemaphore = xSemaphoreCreateMutex();
+	pxPeripheralControl->xBlockTime = (50 / portTICK_RATE_MS );
+	//
+	pxNewRTC = ( int8_t * ) pvPortMalloc( sizeof(RTC_device_control_t ));
+	pxPeripheralControl->phDevice = pxNewRTC;
+	// Abro e inicializo el RTC solo la primera vez que soy invocado
 	RTC_init();
 
 	return(1);
@@ -555,4 +570,120 @@ size_t xReturn = 0U;
 
 }
 //------------------------------------------------------------------------------------
+portBASE_TYPE FreeRTOS_RTC_ioctl( Peripheral_Descriptor_t pxPeripheral, uint32_t ulRequest, void *pvValue )
+{
+Peripheral_Control_t * const pxPeripheralControl = ( Peripheral_Control_t * const ) pxPeripheral;
+portBASE_TYPE xReturn = pdPASS;
+RTC_device_control_t *pRTC;
+uint16_t *p;
+
+		pRTC = pxPeripheralControl->phDevice;
+		p = pvValue;
+		switch( ulRequest )
+		{
+			case ioctlOBTAIN_BUS_SEMPH:
+				// Espero el semaforo en forma persistente.
+				while ( xSemaphoreTake(pxPeripheralControl->xBusSemaphore, ( TickType_t ) 1 ) != pdTRUE )
+					taskYIELD();
+				break;
+			case ioctlRELEASE_BUS_SEMPH:
+				xSemaphoreGive( pxPeripheralControl->xBusSemaphore );
+				break;
+			case ioctlSET_TIMEOUT:
+				pxPeripheralControl->xBlockTime = *p;
+				break;
+			default :
+				xReturn = pdFAIL;
+				break;
+		}
+		return xReturn;
+
+}
+//------------------------------------------------------------------------------------
+// FUNCIONES DE SPI
+//------------------------------------------------------------------------------------
+portBASE_TYPE FreeRTOS_SPI_open( Peripheral_Control_t * const pxPeripheralControl, const uint32_t flags )
+{
+
+RTC_device_control_t *pxNewRTC;
+
+	// Asigno las funciones particulares ed write,read,ioctl
+	pxPeripheralControl->write = FreeRTOS_SPI_write;
+	pxPeripheralControl->read = FreeRTOS_SPI_read;
+	pxPeripheralControl->ioctl = FreeRTOS_SPI_ioctl;
+
+	// Creo el semaforo del bus I2C
+	pxPeripheralControl->xBusSemaphore = xSemaphoreCreateMutex();
+	pxPeripheralControl->xBlockTime = (50 / portTICK_RATE_MS );
+	//
+	pxNewRTC = ( int8_t * ) pvPortMalloc( sizeof(RTC_device_control_t ));
+	pxPeripheralControl->phDevice = pxNewRTC;
+	// Abro e inicializo el SPI solo la primera vez que soy invocado
+	SPI_init();
+
+	return(1);
+}
+//------------------------------------------------------------------------------------
+size_t FreeRTOS_SPI_write( Peripheral_Descriptor_t const pxPeripheral, const void *pvBuffer, const size_t xBytes )
+{
+Peripheral_Control_t * const pxPeripheralControl = ( Peripheral_Control_t * const ) pxPeripheral;
+//I2C_device_control_t *pI2C;
+size_t xReturn = 0U;
+
+//	pI2C = pxPeripheralControl->phDevice;
+
+//	if ( I2C_master_write(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, xBytes) == true ) {
+//		xReturn = xBytes;
+//	}
+
+	return(xReturn);
+}
+//------------------------------------------------------------------------------------
+size_t FreeRTOS_SPI_read( Peripheral_Descriptor_t const pxPeripheral, void * const pvBuffer, const size_t xBytes )
+{
+Peripheral_Control_t * const pxPeripheralControl = ( Peripheral_Control_t * const ) pxPeripheral;
+//I2C_device_control_t *pI2C;
+size_t xReturn = 0U;
+
+//	pI2C = pxPeripheralControl->phDevice;
+
+//	if ( I2C_master_read(pI2C->devAddress, pI2C->byteAddressLength, pI2C->byteAddress, (char *)pvBuffer, xBytes) == true ) {
+//		xReturn = xBytes;
+//	}
+
+	return(xReturn);
+
+}
+//------------------------------------------------------------------------------------
+portBASE_TYPE FreeRTOS_SPI_ioctl( Peripheral_Descriptor_t pxPeripheral, uint32_t ulRequest, void *pvValue )
+{
+Peripheral_Control_t * const pxPeripheralControl = ( Peripheral_Control_t * const ) pxPeripheral;
+portBASE_TYPE xReturn = pdPASS;
+SPI_device_control_t *pSPI;
+uint16_t *p;
+
+		pSPI = pxPeripheralControl->phDevice;
+		p = pvValue;
+		switch( ulRequest )
+		{
+			case ioctlOBTAIN_BUS_SEMPH:
+				// Espero el semaforo en forma persistente.
+				while ( xSemaphoreTake(pxPeripheralControl->xBusSemaphore, ( TickType_t ) 1 ) != pdTRUE )
+					taskYIELD();
+				break;
+			case ioctlRELEASE_BUS_SEMPH:
+				xSemaphoreGive( pxPeripheralControl->xBusSemaphore );
+				break;
+			case ioctlSET_TIMEOUT:
+				pxPeripheralControl->xBlockTime = *p;
+				break;
+			default :
+				xReturn = pdFAIL;
+				break;
+		}
+		return xReturn;
+
+}
+//------------------------------------------------------------------------------------
+
 
